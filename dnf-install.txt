@@ -1,0 +1,2 @@
+python-systemd
+python-twisted
