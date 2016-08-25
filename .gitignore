@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+#python-systemd
+python-systemd-master/
+
 # C extensions
 *.so
 
