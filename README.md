@@ -6,30 +6,31 @@
 ### Installation
 
 
-This should work on CentOS/RHEL
+Create a Big Query table using schema.txt (default is to use the database "logs" and table "pyjdbq")
+
+These installation instructions should work on CentOS/RHEL
 
 Prepare the system by installing dependencies and creating a pyjdbq user
 with home directory /opt/pyjdbq and adding them to the systemd-journal group
 (which means they can read all journald entries)
 
 ```bash
-sudo yum install python-systemd
+sudo dnf install python-systemd unzip
 sudo useradd -d /opt/pyjdbq -G systemd-journal -m -s /sbin/nologin pyjdbq
+sudo -u pyjdbq pip install google-api-python-client -t /opt/pyjdbq/
 ```
 
 Download pyjdbq and move it into /opt/pyjdbq
 
 ```bash
 
-wget https://github.com/xlfe/pyjdbq/archive/master.zip
+curl -LOk https://github.com/xlfe/pyjdbq/archive/master.zip
 unzip master.zip
 sudo cp pyjdbq-master/* /opt/pyjdbq
 
 # Put your JSON Google Big Query service account credentials file into the same directory
 sudo mv credentials.json /opt/pyjdbq
 
-sudo chmod +x /opt/pyjdbq
-sudo chmod -R 640 /opt/pyjdbq
 sudo chown -R pyjdbq: /opt/pyjdbq
 ```
 
@@ -64,8 +65,7 @@ Install the systemd unit file and check your journald logs to make sure there's 
 
 sudo mv /opt/pyjdbq/pyjdbq.service /etc/systemd/system/
 sudo systemctl enable pyjdbq
-sudo systemctl start pyjdbq
-sudo journalctl -f
+sudo systemctl start pyjdbq; sudo journalctl -f
 ```
 
 
