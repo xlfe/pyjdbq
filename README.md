@@ -28,7 +28,9 @@ sudo cp pyjdbq-master/* /opt/pyjdbq
 # Put your JSON Google Big Query service account credentials file into the same directory
 sudo mv credentials.json /opt/pyjdbq
 
-sudo chown -R pyjdbq: /opt/pyjdbq/*
+sudo chmod +x /opt/pyjdbq
+sudo chmod -R 640 /opt/pyjdbq
+sudo chown -R pyjdbq: /opt/pyjdbq
 ```
 
 Finally install the systemd script (you should edit it to set options)
@@ -55,5 +57,16 @@ optional arguments:
   --timeout TIMEOUT  Seconds to wait for COUNT logs before inserting anyway
   --debug            Extra verbose
 ```
+
+Install the systemd unit file and check your journald logs to make sure there's no errors!
+
+```bash
+
+sudo mv /opt/pyjdbq/pyjdbq.service /etc/systemd/system/
+sudo systemctl enable pyjdbq
+sudo systemctl start pyjdbq
+sudo journalctl -f
+```
+
 
 

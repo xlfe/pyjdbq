@@ -28,9 +28,9 @@ if __name__ == '__main__':
 
     parser.add_argument('--dataset', help='BigQuery dataset', default='logs')
     parser.add_argument('--table', help='BigQuery table', default='pyjdbq')
-    parser.add_argument('--creds', help='JSON credentials file for BigQuery', default='./credentials.json')
+    parser.add_argument('--creds', help='JSON credentials file for BigQuery', default='/opt/pyjdbq/credentials.json')
 
-    parser.add_argument('--cursor', help='Full path to store the cursor file', default='/tmp/pyjdbq-journal-cursor')
+    parser.add_argument('--cursor', help='Full path to store the cursor file', default='/opt/pyjdbq/journal-cursor')
     parser.add_argument('--count', help='Events to store before inserting', type=int, default=500)
     parser.add_argument('--timeout', help='Seconds to wait for COUNT logs before inserting anyway', type=int, default=30)
 

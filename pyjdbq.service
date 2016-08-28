@@ -7,5 +7,8 @@ ExecStart=/usr/bin/python -u /opt/pyjdbq/pyjdbq.py
 Restart=always
 User=pyjdbq
 
+[Exec]
+WorkingDirectory=~
+
 [Install]
 WantedBy=multi-user.target
