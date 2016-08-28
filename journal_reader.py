@@ -2,36 +2,74 @@
 
 Read from journald log
 
-# Privileged programs (currently UID 0) may attach OBJECT_PID= to a message. This will instruct systemd-journald to attach additional fields on behalf of the caller:
-#
-# OBJECT_PID=PID
-# PID of the program that this message pertains to.
-#
-# OBJECT_UID=, OBJECT_GID=, OBJECT_COMM=, OBJECT_EXE=, OBJECT_CMDLINE=, OBJECT_AUDIT_SESSION=, OBJECT_AUDIT_LOGINUID=, OBJECT_SYSTEMD_CGROUP=, OBJECT_SYSTEMD_SESSION=, OBJECT_SYSTEMD_OWNER_UID=, OBJECT_SYSTEMD_UNIT=, OBJECT_SYSTEMD_USER_UNIT=
-# These are additional fields added automatically by systemd-journald. Their meaning is the same as _UID=, _GID=, _COMM=, _EXE=, _CMDLINE=, _AUDIT_SESSION=, _AUDIT_LOGINUID=, _SYSTEMD_CGROUP=, _SYSTEMD_SESSION=, _SYSTEMD_UNIT=, _SYSTEMD_USER_UNIT=, and _SYSTEMD_OWNER_UID= as described above, except that the process identified by PID is described, instead of the process which logged the message.
+Set the frequency to add logs to the table using
 
 """
 
 import select
+import logging
 from systemd import journal
-from datetime import datetime
+import datetime
+from uuid import UUID
+import time
+import json
+
+valid_fields = ['priority', 'message', 'errno', 'syslog_facility', 'syslog_identifier', 'syslog_pid', '_pid', '_uid',
+                '_gid', 'unit', '_comm', '_exe', '_cmdline', '_cap_effective', '_audit_session', '_audit_loginuid',
+                '_systemd_cgroup', '_systemd_session', '_systemd_unit', '_systemd_user_unit', '_systemd_owner_uid',
+                '_systemd_slice', '_selinux_context', '_boot_id', '_machine_id', '_hostname', '_transport',
+                '_kernel_device', '_kernel_subsystem', '_udev_sysname', '_udev_devnode', '_udev_devlink', 'code_file',
+                'code_line', 'code_function', '__realtime_timestamp']
+
+
+def convert_value(value):
+    if type(value) == UUID:
+        return str(value)
+    elif isinstance(value, datetime.datetime):
+        return str(time.mktime(value.timetuple()) + value.microsecond / 1000.0)
+    elif isinstance(value, datetime.timedelta):
+        return None
+    return str(value)
+
+
+def transform_entry(entry):
+
+    result = {
+        'json': {},
+        'insertId': entry['__CURSOR']
+    }
+    extra = {}
+    for k,v in entry.iteritems():
+        if k.lower() in valid_fields:
+            result['json'][k.lower()] = convert_value(entry[k])
+        elif k.startswith('__') is False and k not in ['_SOURCE_REALTIME_TIMESTAMP']:
+            extra[k.lower()] = convert_value(entry[k])
+
+    if extra:
+        result['json']['extra'] = json.dumps(extra)
+
+    return result
 
 class JournalReader(object):
-    CURSOR_FILE = '/tmp/pyjqbq-journal-cursor'
-    COUNT_THRESHOLD = 500
-    SECOND_THRESHOLD = 60
 
-    def __init__(self):
+    def __init__(self, writer, log, args):
 
+        self.writer = writer
         j = journal.Reader()
         j.log_level(journal.LOG_DEBUG)
+        self.log = log
+        self.CURSOR_FILE = args.cursor
+        self.COUNT_THRESHOLD = args.count
+        self.SECOND_THRESHOLD = args.timeout
 
         try:
             with open(self.CURSOR_FILE,'r') as cfile:
                 self.cursor = cfile.read()
             j.seek_cursor(self.cursor)
+            self.log.info('Loaded cursor from file')
         except IOError:
             #No cursor - start from the earliest available data
+            self.log.info('No cursor start from the start')
             j.seek_head()
 
         j.get_previous()
@@ -42,39 +80,83 @@ class JournalReader(object):
         self.journal = j
         self.poll = p
         self.bucket = []
-        self.last_ship = datetime.now()
+        self.last_ship = None
 
-    def full_bucket(self):
+    def save_cursor(self):
+        with open(self.CURSOR_FILE,'w') as cfile:
+            cfile.write(self.cursor)
+
+    @property
+    def seconds_since_last_ship(self):
+        if not self.last_ship:
+            return self.SECOND_THRESHOLD + 10
+        return (datetime.datetime.now() - self.last_ship).total_seconds()
+
+    def check_bucket(self):
         """
         Do we need to ship the log entries yet?
         """
 
+        if not self.bucket:
+            self.log.debug('Nothing in bucket')
+            return False
+
         if len(self.bucket) >= self.COUNT_THRESHOLD:
-            return True
+            self.log.debug('Bucket is full')
+            self.ship_logs()
 
-        if (datetime.now() - self.last_ship).total_seconds() >= self.SECOND_THRESHOLD:
-            return True
+        elif self.seconds_since_last_ship >= self.SECOND_THRESHOLD:
+            self.log.debug('Timeout passed')
+            self.ship_logs()
 
+        self.log.debug('not ready to ship')
         return False
 
-    def run(self):
 
-        while self.poll.poll():
+    def run(self):
+        """
+
+        """
+
+        while True:
+
+            #get all entries currently available
+            for entry in self.journal:
+                self.bucket.append(transform_entry(entry))
+                self.cursor = entry['__CURSOR']
+
+                self.check_bucket()
+            else:
+                self.check_bucket()
+
+            max_delay = self.SECOND_THRESHOLD - self.seconds_since_last_ship
+
+            if max_delay < 0:
+                #wait indefinately for something to ship...
+                self.poll.poll()
+            else:
+                self.poll.poll(max_delay*1000)
+
             if self.journal.process() != journal.APPEND:
                 #Ignore NOP and INVALIDATE entries
+                self.log.debug('NOP or INVALIDATE')
                 continue
 
-            for entry in self.journal:
-                self.bucket.append(entry)
-
-                if self.full_bucket():
-                    self.ship_logs()
 
     def ship_logs(self):
         """
         Now ship the logs to BigQuery
         """
-        raise NotImplementedError()
+        count = len(self.bucket)
+        try:
+            self.writer.put(self.bucket)
+            self.last_ship = datetime.datetime.now()
+            self.save_cursor()
+            self.log.info('SHIPPED count={}'.format(count))
+        except:
+            raise
+
+        self.bucket = []
 
 
 
