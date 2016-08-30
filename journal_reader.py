@@ -7,12 +7,15 @@ Set the frequency to add logs to the table using
 """
 
 import select
-import logging
 from systemd import journal
 import datetime
 from uuid import UUID
-import time
 import json
+import pytz
+from tzlocal import get_localzone
+
+# get local timezone
+local_tz = get_localzone()
 
 valid_fields = ['priority', 'message', 'errno', 'syslog_facility', 'syslog_identifier', 'syslog_pid', '_pid', '_uid',
                 '_gid', 'unit', '_comm', '_exe', '_cmdline', '_cap_effective', '_audit_session', '_audit_loginuid',
@@ -25,7 +28,8 @@ def convert_value(value):
     if type(value) == UUID:
         return str(value)
     elif isinstance(value, datetime.datetime):
-        return value.isoformat()
+        #return a UTC timestamp - conversion required because systemd returns a naive timestamp...
+        return local_tz.localize(value).isoformat()
     elif isinstance(value, datetime.timedelta):
         return value.total_seconds()
     return str(value)
