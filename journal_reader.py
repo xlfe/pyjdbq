@@ -19,36 +19,37 @@ valid_fields = ['priority', 'message', 'errno', 'syslog_facility', 'syslog_ident
                 '_systemd_cgroup', '_systemd_session', '_systemd_unit', '_systemd_user_unit', '_systemd_owner_uid',
                 '_systemd_slice', '_selinux_context', '_boot_id', '_machine_id', '_hostname', '_transport',
                 '_kernel_device', '_kernel_subsystem', '_udev_sysname', '_udev_devnode', '_udev_devlink', 'code_file',
-                'code_line', 'code_function', '__realtime_timestamp']
-
+                'code_line', 'code_function', '__realtime_timestamp', '_source_realtime_timestamp']
 
 def convert_value(value):
     if type(value) == UUID:
         return str(value)
     elif isinstance(value, datetime.datetime):
-        return str(time.mktime(value.timetuple()) + value.microsecond / 1000.0)
+        return value.isoformat()
     elif isinstance(value, datetime.timedelta):
-        return None
+        return value.total_seconds()
     return str(value)
-
 
 def transform_entry(entry):
 
-    result = {
-        'json': {},
-        'insertId': entry['__CURSOR']
-    }
+    t = {}
     extra = {}
+
     for k,v in entry.iteritems():
+
         if k.lower() in valid_fields:
-            result['json'][k.lower()] = convert_value(entry[k])
-        elif k.startswith('__') is False and k not in ['_SOURCE_REALTIME_TIMESTAMP']:
+            t[k.lower()] = convert_value(entry[k])
+
+        elif k.startswith('__') is False:
             extra[k.lower()] = convert_value(entry[k])
 
     if extra:
-        result['json']['extra'] = json.dumps(extra)
+        t['extra'] = json.dumps(extra)
 
-    return result
+    return {
+        'insertId': entry['__CURSOR'],
+        'json': t
+    }
 
 class JournalReader(object):
 
@@ -148,14 +149,10 @@ class JournalReader(object):
         Now ship the logs to BigQuery
         """
         count = len(self.bucket)
-        try:
-            self.writer.put(self.bucket)
-            self.last_ship = datetime.datetime.now()
-            self.save_cursor()
-            self.log.info('SHIPPED count={}'.format(count))
-        except:
-            raise
-
+        self.writer.put(self.bucket)
+        self.last_ship = datetime.datetime.now()
+        self.save_cursor()
+        self.log.info('SHIPPED count={}'.format(count))
         self.bucket = []
 
 

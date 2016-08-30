@@ -19,7 +19,7 @@ class BigQueryWriter(object):
             }
         ).execute(num_retries=self.RETRIES)
 
-        if response['kind'] == "bigquery#tableDataInsertAllResponse":
+        if response['kind'] == "bigquery#tableDataInsertAllResponse" and len(response) == 1:
             return True
         else:
             raise ValueError(json.dumps(response))
