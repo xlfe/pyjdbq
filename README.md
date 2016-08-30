@@ -17,7 +17,7 @@ with home directory /opt/pyjdbq and adding them to the systemd-journal group
 ```bash
 sudo dnf install python-systemd unzip
 sudo useradd -d /opt/pyjdbq -G systemd-journal -m -s /sbin/nologin pyjdbq
-sudo -u pyjdbq pip install google-api-python-client -t /opt/pyjdbq/
+sudo -u pyjdbq pip install google-api-python-client pytz tzlocal -t /opt/pyjdbq/
 ```
 
 Download pyjdbq and move it into /opt/pyjdbq
