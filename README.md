@@ -21,16 +21,14 @@ sudo -u pyjdbq pip install google-api-python-client pytz tzlocal -t /opt/pyjdbq/
 ```
 
 Download pyjdbq and move it into /opt/pyjdbq
+Put your JSON Google Big Query service account credentials.json file into the same directory
 
 ```bash
 
 curl -LOk https://github.com/xlfe/pyjdbq/archive/master.zip
 unzip master.zip
 sudo cp pyjdbq-master/* /opt/pyjdbq
-
-# Put your JSON Google Big Query service account credentials file into the same directory
 sudo mv credentials.json /opt/pyjdbq
-
 sudo chown -R pyjdbq: /opt/pyjdbq
 ```
 
@@ -59,7 +57,7 @@ optional arguments:
   --debug            Extra verbose
 ```
 
-Install the systemd unit file and check your journald logs to make sure there's no errors!
+Install the systemd unit file and check your journald logs to make sure there's no errors
 
 ```bash
 

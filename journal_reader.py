@@ -13,6 +13,7 @@ from uuid import UUID
 import json
 import pytz
 from tzlocal import get_localzone
+import time
 
 # get local timezone
 local_tz = get_localzone()
@@ -61,8 +62,8 @@ class JournalReader(object):
 
         self.writer = writer
         j = journal.Reader()
-        j.log_level(journal.LOG_DEBUG)
         self.log = log
+        self.total_shipped = 0
         self.CURSOR_FILE = args.cursor
         self.COUNT_THRESHOLD = args.count
         self.SECOND_THRESHOLD = args.timeout
@@ -102,7 +103,7 @@ class JournalReader(object):
         Do we need to ship the log entries yet?
         """
 
-        if not self.bucket:
+        if not self.bucket or len(self.bucket) == 1:
             self.log.debug('Nothing in bucket')
             return False
 
@@ -119,14 +120,13 @@ class JournalReader(object):
 
 
     def run(self):
-        """
-
-        """
 
         while True:
+            time.sleep(1)
 
             #get all entries currently available
             for entry in self.journal:
+                #print transform_entry(entry)
                 self.bucket.append(transform_entry(entry))
                 self.cursor = entry['__CURSOR']
 
@@ -142,11 +142,6 @@ class JournalReader(object):
             else:
                 self.poll.poll(max_delay*1000)
 
-            if self.journal.process() != journal.APPEND:
-                #Ignore NOP and INVALIDATE entries
-                self.log.debug('NOP or INVALIDATE')
-                continue
-
 
     def ship_logs(self):
         """
@@ -156,7 +151,11 @@ class JournalReader(object):
         self.writer.put(self.bucket)
         self.last_ship = datetime.datetime.now()
         self.save_cursor()
-        self.log.info('SHIPPED count={}'.format(count))
+        self.log.debug('SHIPPED count={}'.format(count))
+        self.total_shipped += count
+        if self.total_shipped > 500:
+            self.log.info('SHIPPED count={}'.format(self.total_shipped))
+            self.total_shipped = 0
         self.bucket = []
 
 
