@@ -121,8 +121,9 @@ class JournalReader(object):
 
     def run(self):
 
-        while True:
-            time.sleep(1)
+        while self.poll.poll():
+            if self.journal.process() != journal.APPEND:
+                continue
 
             #get all entries currently available
             for entry in self.journal:
@@ -130,18 +131,7 @@ class JournalReader(object):
                 self.bucket.append(transform_entry(entry))
                 self.cursor = entry['__CURSOR']
 
-                self.check_bucket()
-            else:
-                self.check_bucket()
-
-            max_delay = self.SECOND_THRESHOLD - self.seconds_since_last_ship
-
-            if max_delay < 0:
-                #wait indefinately for something to ship...
-                self.poll.poll()
-            else:
-                self.poll.poll(max_delay*1000)
-
+            self.check_bucket()
 
     def ship_logs(self):
         """
