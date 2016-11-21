@@ -1,6 +1,6 @@
 [Unit]
 Description=Python Journald to BigQuery logger
-After=syslog.target
+After=network-online.target
 
 [Service]
 ExecStart=/usr/bin/python -u /opt/pyjdbq/pyjdbq.py
