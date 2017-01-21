@@ -12,6 +12,7 @@ import datetime
 from uuid import UUID
 import json
 import pytz
+import itertools
 from tzlocal import get_localzone
 import time
 
@@ -24,6 +25,21 @@ valid_fields = ['priority', 'message', 'errno', 'syslog_facility', 'syslog_ident
                 '_systemd_slice', '_selinux_context', '_boot_id', '_machine_id', '_hostname', '_transport',
                 '_kernel_device', '_kernel_subsystem', '_udev_sysname', '_udev_devnode', '_udev_devlink', 'code_file',
                 'code_line', 'code_function', '__realtime_timestamp', '_source_realtime_timestamp']
+
+def chunker(iterable, chunksize):
+    """
+    Return elements from the iterable in `chunksize`-ed lists. The last returned
+    chunk may be smaller (if length of collection is not divisible by `chunksize`).
+
+    >>> print list(chunker(xrange(10), 3))
+    [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9]]
+    """
+    i = iter(iterable)
+    while True:
+        wrapped_chunk = [list(itertools.islice(i, int(chunksize)))]
+        if not wrapped_chunk[0]:
+            break
+        yield wrapped_chunk.pop()
 
 def convert_value(value):
     if type(value) == UUID:
@@ -138,7 +154,8 @@ class JournalReader(object):
         Now ship the logs to BigQuery
         """
         count = len(self.bucket)
-        self.writer.put(self.bucket)
+        for chunk in chunker(self.bucket, self.COUNT_THRESHOLD):
+            self.writer.put(chunk)
         self.last_ship = datetime.datetime.now()
         self.save_cursor()
         self.log.debug('SHIPPED count={}'.format(count))

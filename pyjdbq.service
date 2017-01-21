@@ -6,9 +6,7 @@ After=syslog.target
 ExecStart=/usr/bin/python -u /opt/pyjdbq/pyjdbq.py
 Restart=always
 User=pyjdbq
-
-[Exec]
-WorkingDirectory=~
+WorkingDirectory=/opt/pyjdbq/
 
 [Install]
 WantedBy=multi-user.target
